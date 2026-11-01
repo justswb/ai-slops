@@ -1,0 +1,66 @@
+name: Spring Dependencies Manager
+on:
+  push:
+    paths: ['spring-deps-mgr/**', '.github/workflows/spring-deps-mgr.yml']
+    tags: ['spring-deps-mgr/v*']
+  pull_request:
+    paths: ['spring-deps-mgr/**', '.github/workflows/spring-deps-mgr.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: spring-deps-mgr
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: spring-deps-mgr/go.mod
+          cache: false
+      - run: go test ./...
+      - if: runner.os == 'Linux'
+        run: go test -race ./...
+      - run: go vet ./...
+  package:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: spring-deps-mgr/go.mod
+          cache: false
+      - shell: pwsh
+        env:
+          BUILD_REF: ${{ github.ref_name }}
+        run: |
+          $version = if ($env:BUILD_REF.StartsWith('spring-deps-mgr/v')) { $env:BUILD_REF.Substring('spring-deps-mgr/v'.Length) } else { '0.0.0' }
+          ./spring-deps-mgr/package.ps1 -Version $version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spring-deps-mgr-binaries
+          path: |
+            spring-deps-mgr/dist/spring-deps-mgr.exe
+            spring-deps-mgr/dist/SHA256SUMS
+  release:
+    if: startsWith(github.ref, 'refs/tags/spring-deps-mgr/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: spring-deps-mgr-binaries
+          path: dist
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" dist/* --title "$RELEASE_TAG" --generate-notes
