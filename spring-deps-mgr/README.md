@@ -77,17 +77,29 @@ Boot 버전은 `org.springframework.boot` 플러그인의 리터럴 버전에서
 - 변경 배치 전체를 검증한 뒤 임시 파일로 교체합니다. 선택 중 원본이 바뀌면 덮어쓰기를 거부합니다. 심볼릭 링크는 지원하지 않습니다.
 - Gradle 빌드/의존성 해석은 실행하지 않습니다. 일반적인 Gradle 프로그램 전체를 해석하는 도구는 아닙니다.
 
-## 바이너리와 운영체제
+## 설치와 운영체제
 
-Go나 JVM 없이 실행하는 단일 바이너리이며, `dist/`에는 Windows amd64용 `spring-deps-mgr.exe`와 `SHA256SUMS`를 생성합니다. 배포 버전은 CI가 프로젝트의 기존 태그를 기준으로 산정하여 바이너리에 주입합니다.
+Go나 JVM 없이 사용하는 Windows amd64 CLI이며, **`spring-deps-mgr-setup.exe` 설치 프로그램**으로 배포합니다. 배포 버전은 CI가 프로젝트의 기존 태그를 기준으로 산정하여 설치 프로그램과 CLI에 주입합니다.
 
 | 운영체제 | 아키텍처 | 파일 |
 |---|---|---|
-| Windows | x64 (amd64) | `spring-deps-mgr.exe` |
+| Windows | x64 (amd64) | `spring-deps-mgr-setup.exe` |
 
-배포 대상은 Windows x64만 지원하며 실제 터미널 키 입력과 실행을 확인했습니다. Linux/macOS 및 ARM64 바이너리는 배포하지 않습니다. 소스 코드의 Windows/Linux/macOS 테스트는 CI에 유지합니다.
+배포 대상은 Windows x64만 지원합니다. Linux/macOS 및 ARM64 설치 프로그램은 배포하지 않습니다.
 
-`spring-deps-mgr.exe`를 PATH에 넣으세요. CI의 **spring-deps-mgr-vX.Y.Z-dry-run** artifact 또는 이 프로젝트의 태그 릴리스에서 다운로드할 수 있습니다.
+1. GitHub Release에서 `spring-deps-mgr-setup.exe`를 다운로드하여 실행합니다. main 반영 전에는 CI의 **spring-deps-mgr-vX.Y.Z-dry-run** artifact로 설치를 시험할 수 있습니다.
+2. 관리자 권한 없이 `%LOCALAPPDATA%\Programs\spring-deps-mgr`에 설치되고 **사용자 PATH**에 자동 등록됩니다. 시스템 PATH는 수정하지 않습니다.
+3. 프로젝트 디렉터리에서 `spring-deps-mgr`를 실행합니다. 설치 프로그램은 CLI나 터미널을 자동 실행하지 않습니다.
+
+업데이트는 새 버전의 설치 프로그램을 다시 실행하면 됩니다. PATH 항목은 중복 추가하지 않습니다. 제거는 **Windows 설정 → 앱 → 설치된 앱 → spring-deps-mgr → 제거**에서 할 수 있으며, 설치한 CLI와 해당 PATH 항목만 제거하고 사용자 파일은 보존합니다.
+
+무인 설치도 지원합니다.
+
+```powershell
+./spring-deps-mgr-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+```
+
+설치 프로그램은 CLI를 내장하므로 설치할 때 추가 다운로드는 필요하지 않습니다. 함께 배포하는 `SHA256SUMS`는 설치 프로그램의 SHA-256 체크섬입니다.
 
 ## 빌드·테스트·패키징
 
@@ -100,10 +112,12 @@ go vet ./...
 go build -trimpath -ldflags="-s -w -X main.version=0.0.0" -o dist/spring-deps-mgr.exe .
 ```
 
-Windows amd64 패키징은 PowerShell 5.1 또는 PowerShell 7에서 실행합니다. 이전 6종 패키징 파일이 있으면 제거하고 단일 실행 파일과 체크섬을 생성합니다.
+Windows amd64 패키징은 PowerShell 5.1 또는 PowerShell 7과 [Inno Setup](https://jrsoftware.org/isinfo.php)이 필요합니다. `package.ps1`은 CLI를 빌드한 뒤 설치 프로그램과 체크섬을 생성합니다. CLI만 필요하면 `-BinaryOnly`를 지정하세요.
 
 ```powershell
 ./package.ps1 -Version 0.0.0
+./package.ps1 -Version 0.0.0 -ISCCPath 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+./package.ps1 -Version 0.0.0 -BinaryOnly
 # Windows 실행 정책으로 차단될 때 해당 프로세스에만 적용
 powershell -NoProfile -ExecutionPolicy Bypass -File ./package.ps1 -Version 0.0.0
 ```
@@ -111,7 +125,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./package.ps1 -Version 0.0.0
 릴리스 정책은 `spring-initializr-cli`와 같습니다.
 
 - 관련 코드가 `main`에 반영되면 최신 `spring-deps-mgr/vX.Y.Z` 태그에서 patch를 올려 자동 태깅·배포합니다.
-- 다른 브랜치의 push는 버전 계산·빌드·테스트만 수행하는 dry run이며 바이너리와 체크섬을 artifact로 보관합니다. 릴리스나 태그를 만들지 않습니다.
+- 다른 브랜치의 push는 버전 계산·빌드·테스트만 수행하는 dry run이며 설치 프로그램과 체크섬을 artifact로 보관합니다. 릴리스나 태그를 만들지 않습니다.
 - **Run workflow**에서 patch/minor/major를 선택할 수 있습니다. `dry_run`을 켜면 배포하지 않으며, main 외 브랜치에서는 항상 dry run입니다.
 - 명시적으로 `spring-deps-mgr/vX.Y.Z` 태그를 push하는 경우에는 기존 도구와 동일하게 해당 버전으로 배포합니다. 이 수동 태그 경로는 main 반영 없이도 배포하므로 사전 버전 표시 목적으로 태그를 push하지 마세요.
 - 같은 커밋의 재실행은 기존 태그를 재사용합니다. 이전 태그가 전혀 없으면 첫 버전은 v0.1.0(major 선택 시 v1.0.0)입니다.
+
+CI는 Windows에서 CLI 테스트·vet·버전 검증과 실제 무인 설치·재설치·제거 테스트를 수행합니다. `installer_test.ps1`은 CI 사용자 PATH를 변경하므로 일회용 GitHub Actions runner에서만 실행하도록 제한했습니다.
