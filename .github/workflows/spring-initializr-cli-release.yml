@@ -3,12 +3,14 @@ name: Spring Initializr CLI Release
 # Every push to main that touches this project's code builds and tests spring-init.exe, then tags the next
 # patch version (v2.0.0 -> v2.0.1) and publishes it as a GitHub release.
 # "Run workflow" does the same with a chosen bump (patch, minor or major).
-# Tag pushes do not trigger this workflow; path filters only apply to branch pushes.
+# Tags use spring-initializr-cli/vX.Y.Z; pushing one releases that exact version.
+# Path filters only apply to branch pushes.
 # Dry run: pushes to any other branch, or "Run workflow" with dry run ticked, do everything except
 # publishing; they report the version they would release and keep the exe as a workflow artifact.
 on:
   push:
     branches: ['**']
+    tags: ['spring-initializr-cli/v*']
     paths:
       - 'spring-initializr-cli/**.go'
       - 'spring-initializr-cli/go.mod'
@@ -35,7 +37,7 @@ permissions:
 # Run releases one at a time so two pushes never compute the same next version; dry runs on other
 # branches get their own group.
 concurrency:
-  group: spring-initializr-cli-release-${{ github.ref }}
+  group: spring-initializr-cli-${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/spring-initializr-cli/v')) && 'release' || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -59,35 +61,45 @@ jobs:
         shell: bash
         env:
           BUMP: ${{ inputs.bump || 'patch' }}
-          PUBLISH: ${{ !inputs.dry_run && github.ref == 'refs/heads/main' }}
+          PUBLISH: ${{ !inputs.dry_run && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/spring-initializr-cli/v')) }}
         run: |
-          # Only plain vX.Y.Z tags count as versions (pre-releases like v2.1.0-rc1 are ignored).
+          prefix=spring-initializr-cli/
+          # Only this project's vX.Y.Z tags count; ignore other projects and pre-releases.
           # (grep exits 1 when nothing matches, which would fail the step under bash -e -o pipefail.)
-          versions() { git tag "$@" --sort=-v:refname | { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | head -n1; }
+          versions() { git tag "$@" --sort=-v:refname | { grep -E '^spring-initializr-cli/v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | head -n1; }
+          if [[ "$GITHUB_REF" == refs/tags/* ]] && [[ ! "$GITHUB_REF_NAME" =~ ^spring-initializr-cli/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo 'Expected a spring-initializr-cli/vX.Y.Z tag' >&2
+            exit 1
+          fi
           # Reuse a version tag already on this commit (manual tag push, or a re-run).
           tag=$(versions --points-at HEAD)
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then tag=$GITHUB_REF_NAME; fi
+          version=${tag#"$prefix"}
           if [ -z "$tag" ]; then
             latest=$(versions)
             if [ -z "$latest" ]; then
               # First release: v0.1.0 (or v1.0.0 when a major bump is asked for).
-              [ "$BUMP" = major ] && tag=v1.0.0 || tag=v0.1.0
+              [ "$BUMP" = major ] && version=v1.0.0 || version=v0.1.0
             else
+              latest=${latest#"$prefix"}
               IFS=. read -r major minor patch <<< "${latest#v}"
               case "$BUMP" in
-                major) tag="v$((major + 1)).0.0" ;;
-                minor) tag="v${major}.$((minor + 1)).0" ;;
-                *)     tag="v${major}.${minor}.$((patch + 1))" ;;
+                major) version="v$((major + 1)).0.0" ;;
+                minor) version="v${major}.$((minor + 1)).0" ;;
+                *)     version="v${major}.${minor}.$((patch + 1))" ;;
               esac
             fi
+            tag="${prefix}${version}"
           fi
           if [ "$PUBLISH" = true ]; then msg="Releasing $tag"; else msg="Dry run: would release $tag (bump: $BUMP)"; fi
           echo "$msg"
           echo "### $msg" >> "$GITHUB_STEP_SUMMARY"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
 
       - name: Build spring-init.exe
-        run: go build -trimpath -ldflags="-s -w -X main.version=${{ steps.version.outputs.tag }}" -o dist/spring-init.exe .
+        run: go build -trimpath -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }}" -o dist/spring-init.exe .
 
       - name: Test spring-init.exe
         run: go test -v ./...
@@ -97,13 +109,13 @@ jobs:
       # Installs the built exe with install.ps1 on the runner, then updates and uninstalls it, checking
       # the user PATH each time.
       - name: Test install script
-        run: ./install_test.ps1 -Exe dist/spring-init.exe -ExpectedVersion ${{ steps.version.outputs.tag }}
+        run: ./install_test.ps1 -Exe dist/spring-init.exe -ExpectedVersion ${{ steps.version.outputs.version }}
 
       - name: Keep exe as workflow artifact (dry run)
         if: steps.version.outputs.publish != 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: spring-init-${{ steps.version.outputs.tag }}-dry-run
+          name: spring-init-${{ steps.version.outputs.version }}-dry-run
           path: spring-initializr-cli/dist/spring-init.exe
 
       # Creates the tag on this commit (if new) and the release, with the exe attached.
