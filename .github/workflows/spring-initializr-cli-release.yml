@@ -1,6 +1,6 @@
 name: Spring Initializr CLI Release
 
-# Every push to main that touches this project builds and tests spring-init.exe, then tags the next
+# Every push to main that touches this project's code builds and tests spring-init.exe, then tags the next
 # patch version (v2.0.0 -> v2.0.1) and publishes it as a GitHub release.
 # "Run workflow" does the same with a chosen bump (patch, minor or major).
 # Tag pushes do not trigger this workflow; path filters only apply to branch pushes.
@@ -10,7 +10,12 @@ on:
   push:
     branches: ['**']
     paths:
-      - 'spring-initializr-cli/**'
+      - 'spring-initializr-cli/**.go'
+      - 'spring-initializr-cli/go.mod'
+      - 'spring-initializr-cli/go.sum'
+      - 'spring-initializr-cli/testdata/**'
+      - 'spring-initializr-cli/install.ps1'
+      - 'spring-initializr-cli/install_test.ps1'
       - '.github/workflows/spring-initializr-cli-release.yml'
   workflow_dispatch:
     inputs:
