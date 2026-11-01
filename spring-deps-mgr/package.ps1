@@ -1,4 +1,8 @@
-param([string]$Version = '0.0.0')
+param(
+    [string]$Version = '0.0.0',
+    [switch]$BinaryOnly,
+    [string]$ISCCPath
+)
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^[A-Za-z0-9._+-]+$') { throw 'Invalid version' }
 Push-Location $PSScriptRoot
@@ -22,8 +26,28 @@ try {
         $obsoletePath = Join-Path $PSScriptRoot "dist/$obsoleteName"
         if (Test-Path -LiteralPath $obsoletePath) { Remove-Item -LiteralPath $obsoletePath }
     }
-    $digest = (Get-FileHash -LiteralPath $outputPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    $hashes = @("$digest  spring-deps-mgr.exe")
+    $packagePath = $outputPath
+    if (-not $BinaryOnly) {
+        $numericVersion = $Version -replace '^v', ''
+        if ($numericVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Installer version must be X.Y.Z or vX.Y.Z' }
+        if (-not $ISCCPath) {
+            $compiler = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+            if ($compiler) { $ISCCPath = $compiler.Source }
+            foreach ($candidate in @(
+                "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+                "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+                "$env:ProgramFiles\Inno Setup 7\ISCC.exe"
+            )) {
+                if (-not $ISCCPath -and (Test-Path -LiteralPath $candidate)) { $ISCCPath = $candidate }
+            }
+        }
+        if (-not $ISCCPath) { throw 'Install Inno Setup or pass -ISCCPath. Use -BinaryOnly to build just the CLI.' }
+        & $ISCCPath "/DAppVersion=$numericVersion" (Join-Path $PSScriptRoot 'installer.iss')
+        if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
+        $packagePath = 'dist/spring-deps-mgr-setup.exe'
+    }
+    $digest = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $hashes = @("$digest  $([IO.Path]::GetFileName($packagePath))")
     [IO.File]::WriteAllLines((Join-Path $PSScriptRoot 'dist/SHA256SUMS'), [string[]]$hashes, [Text.UTF8Encoding]::new($false))
 } finally {
     $env:GOOS = $previousOS
