@@ -79,7 +79,7 @@ Boot 버전은 `org.springframework.boot` 플러그인의 리터럴 버전에서
 
 ## 바이너리와 운영체제
 
-버전은 **0.0.0**입니다. Go나 JVM 없이 실행하는 단일 바이너리이며, `dist/`에는 Windows amd64용 `spring-deps-mgr.exe`와 `SHA256SUMS`를 생성합니다.
+Go나 JVM 없이 실행하는 단일 바이너리이며, `dist/`에는 Windows amd64용 `spring-deps-mgr.exe`와 `SHA256SUMS`를 생성합니다. 배포 버전은 CI가 프로젝트의 기존 태그를 기준으로 산정하여 바이너리에 주입합니다.
 
 | 운영체제 | 아키텍처 | 파일 |
 |---|---|---|
@@ -87,7 +87,7 @@ Boot 버전은 `org.springframework.boot` 플러그인의 리터럴 버전에서
 
 배포 대상은 Windows x64만 지원하며 실제 터미널 키 입력과 실행을 확인했습니다. Linux/macOS 및 ARM64 바이너리는 배포하지 않습니다. 소스 코드의 Windows/Linux/macOS 테스트는 CI에 유지합니다.
 
-`spring-deps-mgr.exe`를 PATH에 넣으세요. CI의 **spring-deps-mgr-binaries** artifact 또는 이 프로젝트의 태그 릴리스에서 다운로드할 수 있습니다.
+`spring-deps-mgr.exe`를 PATH에 넣으세요. CI의 **spring-deps-mgr-vX.Y.Z-dry-run** artifact 또는 이 프로젝트의 태그 릴리스에서 다운로드할 수 있습니다.
 
 ## 빌드·테스트·패키징
 
@@ -108,4 +108,10 @@ Windows amd64 패키징은 PowerShell 5.1 또는 PowerShell 7에서 실행합니
 powershell -NoProfile -ExecutionPolicy Bypass -File ./package.ps1 -Version 0.0.0
 ```
 
-CI는 세 OS의 테스트/vet과 Linux race detector를 실행한 뒤 Windows amd64 `spring-deps-mgr.exe`와 체크섬만 artifact로 보관합니다. `spring-deps-mgr/v0.0.0` 태그를 push하면 바이너리와 체크섬을 GitHub Release로 발행합니다. `spring-initializr-cli` 릴리스와 별도 태그를 사용합니다.
+릴리스 정책은 `spring-initializr-cli`와 같습니다.
+
+- 관련 코드가 `main`에 반영되면 최신 `spring-deps-mgr/vX.Y.Z` 태그에서 patch를 올려 자동 태깅·배포합니다.
+- 다른 브랜치의 push는 버전 계산·빌드·테스트만 수행하는 dry run이며 바이너리와 체크섬을 artifact로 보관합니다. 릴리스나 태그를 만들지 않습니다.
+- **Run workflow**에서 patch/minor/major를 선택할 수 있습니다. `dry_run`을 켜면 배포하지 않으며, main 외 브랜치에서는 항상 dry run입니다.
+- 명시적으로 `spring-deps-mgr/vX.Y.Z` 태그를 push하는 경우에는 기존 도구와 동일하게 해당 버전으로 배포합니다. 이 수동 태그 경로는 main 반영 없이도 배포하므로 사전 버전 표시 목적으로 태그를 push하지 마세요.
+- 같은 커밋의 재실행은 기존 태그를 재사용합니다. 이전 태그가 전혀 없으면 첫 버전은 v0.1.0(major 선택 시 v1.0.0)입니다.
