@@ -25,13 +25,17 @@ Install: `sdk install springboot`, or see the [installation guide](https://docs.
 
 ## Usage
 
-Install, or update by running it again. It needs no admin rights: it puts `spring-init.exe` in `%LOCALAPPDATA%\Programs\spring-init` and adds that folder to your user `PATH`.
+Download and run `spring-init-setup.exe` from [Releases](https://github.com/justswb/ai-slops/releases). Run it again to update. It needs no admin rights: it puts `spring-init.exe` in `%LOCALAPPDATA%\Programs\spring-init` and adds that folder to your user `PATH`.
+
+Alternatively, install using PowerShell:
 
 ```powershell
 irm https://raw.githubusercontent.com/justswb/spring-initializr-cli/master/install.ps1 | iex
 ```
 
-Uninstall:
+Uninstall the setup installation from Windows **Settings > Apps > Installed apps**. This removes the binary and its user PATH entry. Open a new terminal after installing to use the command.
+
+Uninstall a PowerShell installation:
 
 ```powershell
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/justswb/spring-initializr-cli/master/install.ps1))) -Uninstall
@@ -55,6 +59,14 @@ spring-init --help         # print usage (also -h)
 go build -trimpath -ldflags="-s -w" -o dist/spring-init.exe .
 ```
 
+To build the Windows installer, install [Inno Setup 6](https://jrsoftware.org/isinfo.php), then run:
+
+```powershell
+./build-installer.ps1 -Version v2.0.3
+```
+
+Output: `dist/spring-init-setup.exe` and `dist/spring-init.exe`.
+
 ## Test
 
 ```
@@ -63,7 +75,8 @@ go test ./...
 
 ## Release
 
-- Push to `master`: tags the next patch version and publishes a release with the exe.
+- Push to `main`: tags the next patch version and publishes `spring-init-setup.exe` and the standalone exe.
+- CI tests the Windows installer with `installer_test.ps1` on a disposable Windows runner (install, update, uninstall, version and user PATH preservation).
 - CI also tests `install.ps1` with `install_test.ps1` (install, update, uninstall, user `PATH`). That script really edits your user `PATH`, so don't run it on your own machine.
 - **Actions → Release → Run workflow**: choose a patch, minor or major bump. Tick *Dry run* to check the version without releasing.
 - Push to any other branch: dry run only.

@@ -18,6 +18,9 @@ on:
       - 'spring-initializr-cli/testdata/**'
       - 'spring-initializr-cli/install.ps1'
       - 'spring-initializr-cli/install_test.ps1'
+      - 'spring-initializr-cli/installer/**'
+      - 'spring-initializr-cli/build-installer.ps1'
+      - 'spring-initializr-cli/installer_test.ps1'
       - '.github/workflows/spring-initializr-cli-release.yml'
   workflow_dispatch:
     inputs:
@@ -111,12 +114,27 @@ jobs:
       - name: Test install script
         run: ./install_test.ps1 -Exe dist/spring-init.exe -ExpectedVersion ${{ steps.version.outputs.version }}
 
-      - name: Keep exe as workflow artifact (dry run)
+      - name: Ensure Inno Setup is available
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Could not install Inno Setup.' }
+          }
+
+      - name: Build Windows installer
+        run: ./build-installer.ps1 -Version ${{ steps.version.outputs.version }}
+
+      - name: Test Windows installer
+        run: ./installer_test.ps1 -ExpectedVersion ${{ steps.version.outputs.version }}
+
+      - name: Keep installer as workflow artifact (dry run)
         if: steps.version.outputs.publish != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: spring-init-${{ steps.version.outputs.version }}-dry-run
-          path: spring-initializr-cli/dist/spring-init.exe
+          path: |
+            spring-initializr-cli/dist/spring-init-setup.exe
+            spring-initializr-cli/dist/spring-init.exe
 
       # Creates the tag on this commit (if new) and the release, with the exe attached.
       - name: Publish release
@@ -126,4 +144,6 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
-          files: spring-initializr-cli/dist/spring-init.exe
+          files: |
+            spring-initializr-cli/dist/spring-init-setup.exe
+            spring-initializr-cli/dist/spring-init.exe
