@@ -29,7 +29,7 @@ LicenseFile=..\LICENSE
 Source: "dist\spring-deps-mgr.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Messages]
-FinishedLabel=Setup has installed spring-deps-mgr for your user account.%n%nOpen a new terminal and run spring-deps-mgr in your Gradle project. If an existing terminal still uses the old PATH, close and reopen the terminal application.
+FinishedLabel=Setup has installed spring-deps-mgr for your user account and added it to your user PATH.
 
 [Code]
 function NormalizePath(Value: String): String;

@@ -89,7 +89,7 @@ Go나 JVM 없이 사용하는 Windows amd64 CLI이며, **`spring-deps-mgr-setup.
 
 1. GitHub Release에서 `spring-deps-mgr-setup.exe`를 다운로드하여 실행합니다. main 반영 전에는 CI의 **spring-deps-mgr-vX.Y.Z-dry-run** artifact로 설치를 시험할 수 있습니다.
 2. 관리자 권한 없이 `%LOCALAPPDATA%\Programs\spring-deps-mgr`에 설치되고 **사용자 PATH**에 자동 등록됩니다. 시스템 PATH는 수정하지 않습니다.
-3. 터미널을 새로 열고 프로젝트 디렉터리에서 `spring-deps-mgr`를 실행합니다. 기존 터미널 앱이 이전 PATH를 유지하면 앱 자체를 종료한 뒤 다시 여세요.
+3. 프로젝트 디렉터리에서 `spring-deps-mgr`를 실행합니다. 설치 프로그램은 CLI나 터미널을 자동 실행하지 않습니다.
 
 업데이트는 새 버전의 설치 프로그램을 다시 실행하면 됩니다. PATH 항목은 중복 추가하지 않습니다. 제거는 **Windows 설정 → 앱 → 설치된 앱 → spring-deps-mgr → 제거**에서 할 수 있으며, 설치한 CLI와 해당 PATH 항목만 제거하고 사용자 파일은 보존합니다.
 
