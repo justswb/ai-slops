@@ -4,6 +4,8 @@ Interactive terminal tool that builds a `spring init` command from [Spring Initi
 
 Pick project type, language, Boot/Java versions, coordinates and dependencies with arrow keys; `Esc` goes back a step.
 
+> **Note:** Only Windows is currently supported.
+
 ## Tech stack
 
 - **Go 1.27+** (with `golang.org/x/term`)
