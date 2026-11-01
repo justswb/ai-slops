@@ -212,7 +212,8 @@ func edit(src, action string, wanted []dep, kotlin bool) (string, error) {
 			}
 			matched = true
 			if action == "remove" {
-				changes = append(changes, replacement{e.start, e.end, ""})
+				start, end := removalRange(result, e)
+				changes = append(changes, replacement{start, end, ""})
 			} else {
 				changes = append(changes, replacement{e.coordStart, e.coordEnd, d.Coordinate})
 			}
@@ -240,13 +241,95 @@ func edit(src, action string, wanted []dep, kotlin bool) (string, error) {
 			continue
 		}
 		insert := b.close
-		prefix := nl + "    "
+		indent := "    "
+		prefix := nl + indent
 		last := strings.LastIndex(result[:insert], "\n") + 1
 		if strings.TrimSpace(result[last:insert]) == "" {
 			insert = last
-			prefix = "    "
+			prefix = indent
 		}
 		result = result[:insert] + prefix + line + nl + result[insert:]
 	}
+	if result != src {
+		return cleanDependencyGaps(result)
+	}
 	return result, nil
+}
+
+// Normalize only whitespace-only gaps between parsed declarations and the block
+// boundaries. A gap containing a comment, expression or string stays untouched.
+func cleanDependencyGaps(src string) (string, error) {
+	b, err := parse(src)
+	if err != nil {
+		return "", err
+	}
+	if b.open < 0 {
+		return src, nil
+	}
+	type gap struct{ start, end int }
+	var gaps []gap
+	start := b.open + 1
+	for _, e := range b.entries {
+		gaps = append(gaps, gap{start, e.start})
+		start = e.end
+	}
+	gaps = append(gaps, gap{start, b.close})
+	nl := "\n"
+	if strings.Contains(src, "\r\n") {
+		nl = "\r\n"
+	}
+	result := src
+	for i := len(gaps) - 1; i >= 0; i-- {
+		g := gaps[i]
+		space := src[g.start:g.end]
+		if strings.TrimSpace(space) != "" || !strings.Contains(space, "\n") {
+			continue
+		}
+		// Keep the indentation of the following declaration or closing brace.
+		indent := space[strings.LastIndexByte(space, '\n')+1:]
+		result = result[:g.start] + nl + indent + result[g.end:]
+	}
+	// Reparse after gap cleanup to retain correct source offsets, then normalize
+	// only simple standalone declarations; nested closures keep their formatting.
+	b, err = parse(result)
+	if err != nil {
+		return "", err
+	}
+	for i := len(b.entries) - 1; i >= 0; i-- {
+		e := b.entries[i]
+		if e.complex {
+			continue
+		}
+		lineStart := strings.LastIndex(result[:e.start], "\n") + 1
+		if strings.TrimSpace(result[lineStart:e.start]) == "" {
+			result = result[:lineStart] + "    " + result[e.start:]
+		}
+	}
+	return result, nil
+}
+
+// A standalone declaration owns its indentation and newline, but not comments
+// or neighboring statements. Removing the entire owned line prevents blank-line growth.
+func removalRange(src string, e declaration) (int, int) {
+	start, end := e.start, e.end
+	lineStart := strings.LastIndex(src[:start], "\n") + 1
+	lineEnd := len(src)
+	if next := strings.IndexByte(src[end:], '\n'); next >= 0 {
+		lineEnd = end + next
+	}
+	if strings.TrimSpace(src[lineStart:start]) == "" {
+		if strings.TrimSpace(src[end:lineEnd]) == "" {
+			start = lineStart
+			end = lineEnd
+			if end < len(src) {
+				end++
+			}
+		} else {
+			// Leave the existing indentation in front of a trailing comment.
+			for end < lineEnd && (src[end] == ' ' || src[end] == '\t') {
+				end++
+			}
+		}
+	}
+	return start, end
 }

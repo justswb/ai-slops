@@ -4,7 +4,7 @@ Gradle 프로젝트에서 바이너리를 실행하면 의존성 체크리스트
 
 ## 실행
 
-프로젝트 디렉터리에서 실행하세요.
+프로젝트 디렉터리의 터미널에서 실행하세요. 별도 창이나 전체 화면으로 전환하지 않고 기존 출력 아래에 선택 목록을 표시합니다. 종료 후에도 목록과 결과가 터미널에 남습니다.
 
 ```sh
 spring-deps-mgr
@@ -15,9 +15,9 @@ Dependencies | build.gradle | Boot 4.1.2
 Up/Down: move  Space: toggle  Enter: apply  Ctrl-C: cancel
 Filter:
 
-> [x] org.springframework.boot:spring-boot-starter-webmvc  (implementation)
-  [ ] com.h2database:h2  (runtimeOnly) — H2 Database
-  [ ] org.projectlombok:lombok  (annotationProcessor) — Lombok
+> [x] Spring Web  (implementation)
+  [ ] H2 Database  (runtimeOnly)
+  [ ] Lombok  (annotationProcessor)
 ```
 
 | 키 | 동작 |
@@ -29,9 +29,9 @@ Filter:
 | 문자 입력 | 이름·좌표·configuration 검색 필터 |
 | Backspace | 검색어 한 글자 삭제 |
 
-현재 파일에 있는 의존성은 미리 체크됩니다. **체크하면 추가, 체크를 해제하면 제거**합니다. 필터로 숨겨진 항목의 선택도 유지됩니다. 체크를 바꾸지 않으면 파일을 수정하지 않습니다. 기존 의존성의 명시적 버전도 유지합니다.
+현재 파일에 있는 의존성은 미리 체크됩니다. **체크하면 추가, 체크를 해제하면 제거**합니다. 필터로 숨겨진 항목의 선택도 유지됩니다. Enter로 적용할 때 파일 전체의 들여쓰기 탭을 탭 하나당 스페이스 4칸으로 변환합니다. 선택 변경이 없어도 이 변환은 적용하며 문자열 안의 탭과 기존 의존성의 명시적 버전은 유지합니다. Ctrl+C로 취소하면 포맷도 변경하지 않습니다.
 
-기본 화면은 **개별 의존성/configuration 단위**입니다. 같은 Lombok 좌표라도 `compileOnly`, `annotationProcessor` 등을 각각 선택할 수 있습니다. 추가 후보는 선택한 Boot 버전의 Initializr 카탈로그이고, 카탈로그 밖의 기존 문자열 의존성도 표시하여 제거할 수 있습니다. Maven Central 전체 검색이나 임의 좌표 입력 화면은 제공하지 않습니다.
+기본 화면은 **개별 의존성/configuration 단위**입니다. 좌표 경로 대신 라이브러리 이름을 표시하고 카탈로그에 없는 기존 의존성은 artifact 이름을 표시합니다. 같은 Lombok 좌표라도 `compileOnly`, `annotationProcessor` 등을 각각 선택할 수 있습니다. 표시에서 숨긴 원래 좌표로도 검색할 수 있습니다. 추가 후보는 선택한 Boot 버전의 Initializr 카탈로그이고, 카탈로그 밖의 기존 문자열 의존성도 표시하여 제거할 수 있습니다. Maven Central 전체 검색이나 임의 좌표 입력 화면은 제공하지 않습니다.
 
 ## 라이브러리 묶음 선택
 
@@ -39,7 +39,7 @@ Filter:
 spring-deps-mgr --lib
 ```
 
-이 화면에서는 `Spring Web`, `Lombok`, `Validation` 같은 Initializr 라이브러리 이름을 선택합니다. 키 조작은 기본 화면과 같습니다. 개별 의존성이 아니라 Initializr가 생성하는 관련 의존성을 함께 추가·제거합니다. 예를 들어 Lombok은 compileOnly와 annotationProcessor, 해당 Boot 버전의 테스트용 의존성도 함께 처리합니다.
+이 화면에서는 `Spring Web`, `Lombok`, `Validation` 같은 Initializr 라이브러리 이름을 선택합니다. 화면을 처음 열 때만 체크된 항목을 맨 위로 모읍니다. 이후 체크·해제할 때는 다시 정렬하지 않고 항목 순서와 커서 위치를 유지합니다. 키 조작은 기본 화면과 같습니다. 개별 의존성이 아니라 Initializr가 생성하는 관련 의존성을 함께 추가·제거합니다. 예를 들어 Lombok은 compileOnly와 annotationProcessor, 해당 Boot 버전의 테스트용 의존성도 함께 처리합니다.
 
 기존 파일에서 라이브러리의 대표 모듈이 하나라도 발견되면 체크합니다. 일부 의존성만 있는 라이브러리도 체크될 수 있으며, 라이브러리 선택을 변경하여 적용하면 체크된 라이브러리 묶음의 누락된 의존성도 채웁니다. 체크된 라이브러리끼리 공유하는 의존성은 유지합니다. `spring-boot-starter`, `spring-boot-starter-test`, `junit-platform-launcher`는 Initializr의 기본 의존성으로 취급하여 묶음에 포함하지 않습니다.
 
@@ -70,13 +70,12 @@ Boot 버전은 `org.springframework.boot` 플러그인의 리터럴 버전에서
 - 현재 디렉터리에서 파일을 찾습니다. 두 파일이 모두 있으면 `--file`이 필요합니다. 하위 모듈은 자동 탐색하지 않습니다.
 - 최상위 `dependencies {}` 블록 하나의 문자열 좌표 선언을 편집합니다. 블록이 없으면 추가합니다. 여러 블록 또는 중첩된 블록만 있으면 오류로 종료합니다.
 - 작은따옴표/큰따옴표, 괄호 유무, CRLF/LF를 처리하고 다른 설정을 보존합니다.
+- 추가·수정 시 단순 의존성 선언의 들여쓰기는 스페이스 4칸으로 맞추고, 제거 시 독립된 선언의 줄 전체를 지웁니다. 실제 변경 시 블록 경계와 선언 사이에 이미 쌓인 공백 줄도 정리합니다. 주석·문자열 내용과 블록 밖의 공백은 보존합니다.
 - version catalog, map notation, 변수/보간식, project/files, platform 등 동적 선언은 체크리스트 편집 대상이 아닙니다. 이 선언과 카탈로그 후보 간 중복은 자동 감지하지 않습니다.
 - 후속 closure/exclude가 있는 기존 선언은 읽기 전용으로 표시합니다.
 - BOM·추가 저장소·Gradle 플러그인 설정이 필요한 후보는 잠금 표시합니다. 라이브러리 생성 결과에서 추가 BOM/저장소나 복잡한 선언이 발견되면 파일을 변경하지 않고 오류로 종료합니다.
 - 변경 배치 전체를 검증한 뒤 임시 파일로 교체합니다. 선택 중 원본이 바뀌면 덮어쓰기를 거부합니다. 심볼릭 링크는 지원하지 않습니다.
 - Gradle 빌드/의존성 해석은 실행하지 않습니다. 일반적인 Gradle 프로그램 전체를 해석하는 도구는 아닙니다.
-
-설계 판단은 [DESIGN.md](DESIGN.md)에 기록했습니다.
 
 ## 바이너리와 운영체제
 

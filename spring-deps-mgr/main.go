@@ -161,6 +161,10 @@ func runWithChooser(args []string, out io.Writer, choose chooser) error {
 	if err != nil {
 		return err
 	}
+	updated, err = normalizeIndentation(updated)
+	if err != nil {
+		return err
+	}
 	if o.dry {
 		_, err = io.WriteString(out, updated)
 		return err

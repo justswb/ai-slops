@@ -26,7 +26,11 @@ type selection struct {
 func (m *selection) visible() []int {
 	var result []int
 	for i, c := range m.rows {
-		if strings.Contains(strings.ToLower(c.label), strings.ToLower(m.query)) {
+		search := c.label
+		for _, d := range c.deps {
+			search += " " + d.Coordinate
+		}
+		if strings.Contains(strings.ToLower(search), strings.ToLower(m.query)) {
 			result = append(result, i)
 		}
 	}
@@ -138,6 +142,25 @@ func safeText(s string, width int) string {
 	return string(out)
 }
 
+// Redraw only the checklist below the shell's existing output. Do not switch
+// screen buffers, home the cursor, or clear terminal history.
+type inlineRenderer struct {
+	out   io.Writer
+	lines int
+}
+
+func (r *inlineRenderer) draw(lines []string) {
+	if r.lines > 1 {
+		fmt.Fprintf(r.out, "\x1b[%dA", r.lines-1)
+	}
+	fmt.Fprint(r.out, "\r\x1b[0J"+strings.Join(lines, "\r\n"))
+	r.lines = len(lines)
+}
+
+func (r *inlineRenderer) finish() {
+	fmt.Fprint(r.out, "\x1b[0m\x1b[?25h\r\n")
+}
+
 func terminalChecklist(rows []choice, title string) ([]choice, bool, error) {
 	inFD := int(os.Stdin.Fd())
 	outFD := int(os.Stderr.Fd())
@@ -151,8 +174,9 @@ func terminalChecklist(rows []choice, title string) ([]choice, bool, error) {
 		return nil, false, err
 	}
 	defer term.Restore(inFD, state)
-	fmt.Fprint(os.Stderr, "\x1b[?1049h\x1b[?25l")
-	defer fmt.Fprint(os.Stderr, "\x1b[?25h\x1b[?1049l")
+	fmt.Fprint(os.Stderr, "\x1b[?25l")
+	renderer := inlineRenderer{out: os.Stderr}
+	defer renderer.finish()
 	m := selection{rows: rows}
 	keys := newKeyReader(os.Stdin)
 	for {
@@ -162,11 +186,11 @@ func terminalChecklist(rows []choice, title string) ([]choice, bool, error) {
 			height = 24
 		}
 		width = max(20, width-1)
-		page := max(1, height-8)
+		page := max(1, min(12, height-8))
 		visible := m.visible()
 		start := max(0, min(m.cursor-page/2, len(visible)-page))
 		end := min(len(visible), start+page)
-		lines := []string{safeText(title, width), "Up/Down: move  Space: toggle  Enter: apply  Ctrl-C: cancel", safeText("Filter: "+m.query+"  (type to search, Backspace to clear)", width), ""}
+		lines := []string{safeText(title, width), safeText("Up/Down: move  Space: toggle  Enter: apply  Ctrl-C: cancel", width), safeText("Filter: "+m.query+"  (type to search, Backspace to clear)", width), ""}
 		for n := start; n < end; n++ {
 			c := m.rows[visible[n]]
 			mark := "[ ]"
@@ -188,7 +212,7 @@ func terminalChecklist(rows []choice, title string) ([]choice, bool, error) {
 			lines = append(lines, line)
 		}
 		if len(visible) == 0 {
-			lines = append(lines, "No matches. Backspace to clear your filter.")
+			lines = append(lines, safeText("No matches. Backspace to clear your filter.", width))
 		}
 		changed := 0
 		for _, c := range m.rows {
@@ -196,11 +220,11 @@ func terminalChecklist(rows []choice, title string) ([]choice, bool, error) {
 				changed++
 			}
 		}
-		lines = append(lines, fmt.Sprintf("%d shown / %d total | %d changes", len(visible), len(m.rows), changed))
+		lines = append(lines, safeText(fmt.Sprintf("%d shown / %d total | %d changes", len(visible), len(m.rows), changed), width))
 		if len(visible) > 0 && m.rows[visible[m.cursor]].disabled != "" {
 			lines = append(lines, safeText("Locked: "+m.rows[visible[m.cursor]].disabled, width))
 		}
-		fmt.Fprint(os.Stderr, "\x1b[H\x1b[2J"+strings.Join(lines, "\r\n"))
+		renderer.draw(lines)
 		k, err := keys.next()
 		if err != nil {
 			return nil, false, err

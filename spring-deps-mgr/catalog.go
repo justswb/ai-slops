@@ -136,9 +136,25 @@ func makeChoices(b block, catalog []library, libMode bool) []choice {
 			c.initial = c.checked
 			rows = append(rows, c)
 		}
+		sort.SliceStable(rows, func(i, j int) bool { return rows[i].checked && !rows[j].checked })
 		return rows
 	}
 	var rows []choice
+	names := map[string]string{}
+	for _, l := range catalog {
+		for _, d := range l.deps {
+			if names[module(d.Coordinate)] == "" {
+				names[module(d.Coordinate)] = l.name
+			}
+		}
+	}
+	label := func(d dep) string {
+		name := names[module(d.Coordinate)]
+		if name == "" {
+			name = strings.Split(d.Coordinate, ":")[1]
+		}
+		return name + "  (" + d.Config + ")"
+	}
 	seen := map[string]bool{}
 	// Existing versions/configurations are authoritative and remain unchanged unless unchecked.
 	for _, e := range b.entries {
@@ -147,7 +163,7 @@ func makeChoices(b block, catalog []library, libMode bool) []choice {
 			continue
 		}
 		seen[key] = true
-		c := choice{label: e.Coordinate + "  (" + e.Config + ")", deps: []dep{e.dep}, checked: true, initial: true}
+		c := choice{label: label(e.dep), deps: []dep{e.dep}, checked: true, initial: true}
 		for _, other := range b.entries {
 			if depKey(other.dep) == key && other.complex {
 				c.disabled = "complex declaration; read-only"
@@ -163,7 +179,7 @@ func makeChoices(b block, catalog []library, libMode bool) []choice {
 				continue
 			}
 			seen[key] = true
-			rows = append(rows, choice{label: d.Coordinate + "  (" + d.Config + ") — " + l.name, deps: []dep{d}, disabled: l.disabled})
+			rows = append(rows, choice{label: label(d), deps: []dep{d}, disabled: l.disabled})
 		}
 	}
 	sort.SliceStable(rows[existingCount:], func(i, j int) bool { return rows[existingCount+i].label < rows[existingCount+j].label })
