@@ -1,23 +1,17 @@
-name: Release
+name: Spring Initializr CLI Release
 
-# Every push to master that touches the code builds and tests spring-init.exe, then tags the next
+# Every push to main that touches this project builds and tests spring-init.exe, then tags the next
 # patch version (v2.0.0 -> v2.0.1) and publishes it as a GitHub release.
 # "Run workflow" does the same with a chosen bump (patch, minor or major).
-# Pushing a v* tag by hand releases that exact version.
+# Tag pushes do not trigger this workflow; path filters only apply to branch pushes.
 # Dry run: pushes to any other branch, or "Run workflow" with dry run ticked, do everything except
 # publishing; they report the version they would release and keep the exe as a workflow artifact.
 on:
   push:
     branches: ['**']
-    tags: ['v*']
     paths:
-      - '**.go'
-      - go.mod
-      - go.sum
-      - testdata/**
-      - install.ps1
-      - install_test.ps1
-      - .github/workflows/release.yml
+      - 'spring-initializr-cli/**'
+      - '.github/workflows/spring-initializr-cli-release.yml'
   workflow_dispatch:
     inputs:
       bump:
@@ -36,12 +30,15 @@ permissions:
 # Run releases one at a time so two pushes never compute the same next version; dry runs on other
 # branches get their own group.
 concurrency:
-  group: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) && 'release' || github.ref }}
+  group: spring-initializr-cli-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   release:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: spring-initializr-cli
     steps:
       - uses: actions/checkout@v7
         with:
@@ -49,14 +46,15 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version-file: spring-initializr-cli/go.mod
+          cache-dependency-path: spring-initializr-cli/go.sum
 
       - name: Pick version
         id: version
         shell: bash
         env:
           BUMP: ${{ inputs.bump || 'patch' }}
-          PUBLISH: ${{ !inputs.dry_run && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
+          PUBLISH: ${{ !inputs.dry_run && github.ref == 'refs/heads/main' }}
         run: |
           # Only plain vX.Y.Z tags count as versions (pre-releases like v2.1.0-rc1 are ignored).
           # (grep exits 1 when nothing matches, which would fail the step under bash -e -o pipefail.)
@@ -101,7 +99,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: spring-init-${{ steps.version.outputs.tag }}-dry-run
-          path: dist/spring-init.exe
+          path: spring-initializr-cli/dist/spring-init.exe
 
       # Creates the tag on this commit (if new) and the release, with the exe attached.
       - name: Publish release
@@ -111,4 +109,4 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
-          files: dist/spring-init.exe
+          files: spring-initializr-cli/dist/spring-init.exe
